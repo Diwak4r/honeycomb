@@ -192,7 +192,21 @@ function parsePath(path: string): { command: string; remainder: string } {
 	const cleaned = path.replace(/^\/+/, "").replace(/^graph\//, "").replace(/\.md$/, "");
 	const slash = cleaned.indexOf("/");
 	if (slash < 0) return { command: cleaned.toLowerCase(), remainder: "" };
-	return { command: cleaned.slice(0, slash).toLowerCase(), remainder: decodeURIComponent(cleaned.slice(slash + 1)) };
+	return { command: cleaned.slice(0, slash).toLowerCase(), remainder: safeDecode(cleaned.slice(slash + 1)) };
+}
+
+/**
+ * URL-decode a remainder, falling back to the RAW string on a malformed `%` escape.
+ * `decodeURIComponent` throws `URIError` on a lone/short `%` (e.g. a `find/100%` pattern);
+ * {@link handleGraphVfs} promises it "never throws", so an undecodable remainder is passed
+ * through verbatim rather than blowing up the whole render.
+ */
+function safeDecode(s: string): string {
+	try {
+		return decodeURIComponent(s);
+	} catch {
+		return s;
+	}
 }
 
 // ════════════════════════════════════════════════════════════════════════════

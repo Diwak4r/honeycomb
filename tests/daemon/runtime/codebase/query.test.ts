@@ -303,6 +303,14 @@ describe("d-AC-5 zero network — handleGraphVfs reads only the local snapshot",
 		expect(() => handleGraphVfs("graph/bogus/thing", buildFixture())).not.toThrow();
 		expect(handleGraphVfs("graph/bogus/thing", buildFixture())).toContain("unknown");
 	});
+
+	it("d-AC-5 a remainder with a malformed % escape does not throw (never throws contract)", () => {
+		// `decodeURIComponent` throws URIError on a lone/short `%`; the renderer must not.
+		for (const path of ["graph/find/100%", "graph/show/a%zz", "graph/neighborhood/src/x%.ts"]) {
+			expect(() => handleGraphVfs(path, buildFixture())).not.toThrow();
+			expect(typeof handleGraphVfs(path, buildFixture())).toBe("string");
+		}
+	});
 });
 
 // ── Supporting endpoints (FR-4 / FR-7) ──────────────────────────────────────────
