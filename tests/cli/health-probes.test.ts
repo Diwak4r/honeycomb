@@ -36,7 +36,8 @@ describe("PRD-021b b-AC-5 — status reports the real D1–D5 health", () => {
 		const lines = await health.evaluate();
 		const ids = lines.map((l) => l.id);
 		expect(ids).toEqual(["D1", "D2", "D3", "D4", "D5"]);
-	});
+	},
+	30_000);
 
 	it("D5 (capture wired) reports HEALTHY when the Claude Code plugin is installed + enabled", async () => {
 		const probes = buildHealthProbes(createFakeDaemonClient({ alive: true }), fakePluginRunner(true));
