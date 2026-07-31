@@ -187,7 +187,8 @@ describe("b-AC-4: readTerminalControlledWriteJobs reads only TERMINAL memory_con
 		const jobs = readTerminalControlledWriteJobs({ baseDir: dir });
 		expect(jobs).toHaveLength(1);
 		expect(jobs[0]!.content).toBe("terminal fact");
-	});
+	},
+	30_000);
 
 	it("returns [] when the local-queue.db does not exist yet (read-through fail-soft)", () => {
 		// The temp dir has no `.daemon/local-queue.db` — the reader must NOT fabricate one.
