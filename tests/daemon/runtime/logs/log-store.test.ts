@@ -63,13 +63,15 @@ afterEach(() => {
 describe("PRD-043a openLogStore persists to disk", () => {
 	it("AC-1: records written before a restart are queryable after re-opening the same logs.db", () => {
 		// Write three records, then CLOSE (simulating the daemon stopping).
-		const first = openLogStore({ baseDir: dir });
+		// Mock clock so test records (2026-06-20) don't get pruned as "too old" by the startup sweep.
+		const testClock = { now: () => Date.parse("2026-06-20T00:00:00.000Z") };
+		const first = openLogStore({ baseDir: dir, clock: testClock });
 		expect(first.persistent).toBe(true);
 		for (let i = 0; i < 3; i++) first.appendRequest(rec(i));
 		first.close();
 
 		// A FRESH store opens the SAME on-disk file (the daemon restarting) and reads the records back.
-		const second = openLogStore({ baseDir: dir });
+		const second = openLogStore({ baseDir: dir, clock: testClock });
 		const page = second.queryRequests(resolveHistoryQuery({}));
 		expect(page.records).toHaveLength(3);
 		// Newest first.
@@ -79,7 +81,8 @@ describe("PRD-043a openLogStore persists to disk", () => {
 	});
 
 	it("AC-6: the request_log schema carries ONLY the record fields — no header/token/body column", () => {
-		const store = openLogStore({ baseDir: dir });
+		const testClock = { now: () => Date.parse("2026-06-20T00:00:00.000Z") };
+		const store = openLogStore({ baseDir: dir, clock: testClock });
 		store.appendRequest(rec(0));
 		const page = store.queryRequests(resolveHistoryQuery({}));
 		const record = page.records[0] as Record<string, unknown>;
@@ -95,7 +98,8 @@ describe("PRD-043a openLogStore persists to disk", () => {
 	});
 
 	it("the db file lands under .daemon/logs.db (mirrors the secrets .daemon pattern)", () => {
-		const store = openLogStore({ baseDir: dir });
+		const testClock = { now: () => Date.parse("2026-06-20T00:00:00.000Z") };
+		const store = openLogStore({ baseDir: dir, clock: testClock });
 		store.appendRequest(rec(0));
 		store.close();
 		// The file exists at the documented path.
