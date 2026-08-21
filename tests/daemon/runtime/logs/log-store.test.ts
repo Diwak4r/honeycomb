@@ -62,14 +62,17 @@ afterEach(() => {
 
 describe("PRD-043a openLogStore persists to disk", () => {
 	it("AC-1: records written before a restart are queryable after re-opening the same logs.db", () => {
-		// Write three records, then CLOSE (simulating the daemon stopping).
-		const first = openLogStore({ baseDir: dir });
+		// Write three records, then CLOSE (simulating the daemon stopping). The clock is pinned so
+		// the startup retention sweep cannot age-prune the fixture rows: the default 30-day cap
+		// would otherwise delete these 2026-06-20 records once wall-clock time passes 2026-07-20.
+		const clock = { now: () => Date.parse("2026-06-20T00:00:05.000Z") };
+		const first = openLogStore({ baseDir: dir, clock });
 		expect(first.persistent).toBe(true);
 		for (let i = 0; i < 3; i++) first.appendRequest(rec(i));
 		first.close();
 
 		// A FRESH store opens the SAME on-disk file (the daemon restarting) and reads the records back.
-		const second = openLogStore({ baseDir: dir });
+		const second = openLogStore({ baseDir: dir, clock });
 		const page = second.queryRequests(resolveHistoryQuery({}));
 		expect(page.records).toHaveLength(3);
 		// Newest first.
