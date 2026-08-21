@@ -530,6 +530,9 @@ describe("PRD-064h schtasks controller, register/restart/status argv (injected r
 				),
 			).toThrow();
 		},
+		// Four live powershell.exe spawns; hosted Windows runners cold-start PowerShell slowly
+		// (observed >5s per spawn on scheduled CI), so this needs its own generous timeout.
+		120_000,
 	);
 
 	it("isRegistered is true when /Query succeeds, false when it throws (task absent)", () => {
