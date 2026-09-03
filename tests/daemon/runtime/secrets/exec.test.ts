@@ -252,16 +252,26 @@ describe("b-AC-5 a job exceeding its timeout is killed → terminal + redacted p
 		await store.setSecret("MY_SECRET", SECRET, SCOPE);
 		const runner = new SecretExecRunner({ store, audit: audit.sink, killGraceMs: 50 });
 
-		// Print the secret, then sleep far longer than the (tiny) timeout so it MUST be killed.
+		// Print the secret, then keep the event loop alive far longer than the deadline so the
+		// child MUST be killed. Two Windows-CI hazards make the exact script + deadline matter:
+		//   (1) `process.stdout.write` on a Windows PIPE is ASYNCHRONOUS (libuv threadpool) — a
+		//       hard-kill that beats the flush drops the buffered bytes even though the eval ran.
+		//       `fs.writeSync(1, …)` pushes the bytes into the OS pipe SYNCHRONOUSLY, so a later
+		//       SIGTERM/SIGKILL cannot lose them: the settle barrier drains the pipe on close.
+		//   (2) the kill deadline starts right after `spawn()` returns, while a real `node` child
+		//       is still BOOTING — under parallel Windows-CI load boot can exceed a tiny deadline,
+		//       so the kill fires before the eval runs and stdout is legitimately empty (a flaky
+		//       "expected '' to contain 'partial:'"). 5s gives boot a huge margin (sibling
+		//       b-AC-5/evaluate tests already use 30s) while keeping this run bounded.
 		const res = runner.submit({
 			command: NODE,
 			args: [
 				"-e",
-				"process.stdout.write('partial:'+process.env.MY_SECRET);setInterval(()=>{},1000)",
+				"require('fs').writeSync(1,'partial:'+process.env.MY_SECRET);setInterval(()=>{},1000)",
 			],
 			secretNames: ["MY_SECRET"],
 			scope: SCOPE,
-			timeoutMs: 150, // a FAST timeout — the test does not wait 5 minutes.
+			timeoutMs: 5_000, // small enough to keep the test fast, big enough to outlast Windows boot.
 		});
 		expect(res.ok).toBe(true);
 		if (!res.ok) return;
@@ -280,7 +290,7 @@ describe("b-AC-5 a job exceeding its timeout is killed → terminal + redacted p
 		expect(view?.stdout).toContain("partial:");
 		expect(view?.stdout).not.toContain(SECRET);
 		auditHasNoSecret(audit.events);
-	});
+	}, 20_000); // the runaway lives until the (5s) deadline fires; vitest's 5s default would trip.
 });
 
 describe("b-AC-6 concurrent submits beyond the pool QUEUE (and a full queue is rejected)", () => {
